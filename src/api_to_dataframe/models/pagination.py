@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+
+
+JSONValue = Union[None, bool, int, float, str, List["JSONValue"], Dict[str, "JSONValue"]]
 
 
 class PaginationStrategy(str, Enum):
@@ -29,7 +32,7 @@ class PaginationStep:
 
     payload: Any
     params: Dict[str, Any]
-    cursor: Optional[str] = None
+    cursor: Optional[JSONValue] = None
 
 
 @dataclass
@@ -108,7 +111,7 @@ def cursor_iterator(
     fetch_page: Callable[[Dict[str, Any]], Any],
     *,
     cursor_param: str = "cursor",
-    initial_cursor: Optional[str] = None,
+    initial_cursor: Optional[JSONValue] = None,
     next_cursor_key: str = "next_cursor",
     max_pages: Optional[int] = None,
     results_key: Optional[str] = None,
@@ -182,11 +185,28 @@ def _extract_items(page: Any, results_key: Optional[str]) -> Optional[List[Any]]
     return None
 
 
-def _extract_next_cursor(page: Any, next_cursor_key: str) -> Optional[str]:
+def _extract_next_cursor(page: Any, next_cursor_key: str) -> Optional[JSONValue]:
     """Extract the cursor value from a response payload."""
 
     if isinstance(page, dict):
         cursor = page.get(next_cursor_key)
-        if isinstance(cursor, str) or cursor is None:
+        if cursor is None:
+            return None
+        if _is_json_serializable(cursor):
             return cursor
     return None
+
+
+def _is_json_serializable(value: Any) -> bool:
+    """Check whether a value can be represented as JSON."""
+
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return True
+
+    if isinstance(value, list):
+        return all(_is_json_serializable(item) for item in value)
+
+    if isinstance(value, dict):
+        return all(isinstance(key, str) and _is_json_serializable(item) for key, item in value.items())
+
+    return False
