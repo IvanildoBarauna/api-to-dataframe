@@ -1,13 +1,15 @@
-from api_to_dataframe.models.retainer import retry_strategies, Strategies
+from typing import Any, Dict, Optional
+
 from api_to_dataframe.models.get_data import GetData
+from api_to_dataframe.models.retainer import Strategies, retry_strategies
 from api_to_dataframe.utils.logger import logger
 
 
-class ClientBuilder:
+class ClientBuilder:  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-positional-arguments,too-many-arguments
         self,
         endpoint: str,
-        headers: dict = None,
+        headers: Optional[Dict[str, str]] = None,
         retry_strategy: Strategies = Strategies.NO_RETRY_STRATEGY,
         retries: int = 3,
         initial_delay: int = 1,
@@ -57,6 +59,78 @@ class ClientBuilder:
         self.retries = retries
         self.delay = initial_delay
 
+        self._method: str = "GET"
+        self._params: Optional[Dict[str, Any]] = None
+        self._json_payload: Optional[Any] = None
+        self._data_payload: Optional[Any] = None
+        self._files_payload: Optional[Any] = None
+        self._auth: Optional[Any] = None
+        self._session: Optional[Any] = None
+
+    def with_method(self, method: str):
+        """Configure the HTTP method for the request."""
+
+        if not isinstance(method, str) or not method.strip():
+            error_msg = "method must be a non-empty string"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        self._method = method.strip().upper()
+        return self
+
+    def with_params(self, params: Optional[Dict[str, Any]]):
+        """Configure query parameters to be sent with the request."""
+
+        if params is not None and not isinstance(params, dict):
+            error_msg = "params must be a dictionary or None"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        self._params = params
+        return self
+
+    def with_payload(
+        self,
+        *,
+        json: Optional[Any] = None,
+        data: Optional[Any] = None,
+        files: Optional[Any] = None,
+    ):
+        """Configure payload content for the request body."""
+
+        self._json_payload = json
+        self._data_payload = data
+        self._files_payload = files
+        return self
+
+    def with_auth(self, auth: Optional[Any]):
+        """Configure authentication details for the request."""
+
+        self._auth = auth
+        return self
+
+    def with_session(self, session: Optional[Any]):
+        """Configure a custom session implementation for the request."""
+
+        if session is not None and not hasattr(session, "request"):
+            error_msg = "session must provide a request method"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        self._session = session
+        return self
+
+    def with_headers(self, headers: Optional[Dict[str, str]]):
+        """Override headers after initialization while keeping fluent style."""
+
+        if headers is not None and not isinstance(headers, dict):
+            error_msg = "headers must be a dictionary or None"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        self.headers = headers or {}
+        return self
+
     @retry_strategies
     def get_api_data(self):
         """
@@ -73,6 +147,13 @@ class ClientBuilder:
             endpoint=self.endpoint,
             headers=self.headers,
             connection_timeout=self.connection_timeout,
+            method=self._method,
+            params=self._params,
+            json=self._json_payload,
+            data=self._data_payload,
+            files=self._files_payload,
+            auth=self._auth,
+            session=self._session,
         )
 
         return response.json()
