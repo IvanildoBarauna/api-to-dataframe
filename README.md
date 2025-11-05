@@ -78,6 +78,29 @@ df = client.api_to_dataframe(data)
 print(df)
 ```
 
+### Customizing logging
+
+The library does not configure logging automatically. You can either configure
+the default logger provided by ``api_to_dataframe.utils.logger`` or inject a
+custom logger into ``ClientBuilder``:
+
+```python
+import logging
+
+from api_to_dataframe import ClientBuilder, configure_logger
+
+
+stream_handler = logging.StreamHandler()
+configure_logger(
+    handlers=[stream_handler],
+    level=logging.INFO,
+    format="%(asctime)s :: api-to-dataframe[%(levelname)s] :: %(message)s",
+)
+
+custom_logger = logging.getLogger("my-app.api-client")
+client = ClientBuilder(endpoint="https://api.example.com", logger=custom_logger)
+```
+
 ## Important notes:
 * **Opcionals Parameters:** The params timeout, retry_strategy and headers are opcionals.
 * **Default Params Value:** By default the quantity of retries is 3 and the time between retries is 1 second, but you can define manually.

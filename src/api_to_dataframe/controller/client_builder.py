@@ -1,6 +1,8 @@
+import logging
+from typing import Optional
+
 from api_to_dataframe.models.retainer import retry_strategies, Strategies
 from api_to_dataframe.models.get_data import GetData
-from api_to_dataframe.utils.logger import logger
 
 
 class ClientBuilder:
@@ -12,6 +14,7 @@ class ClientBuilder:
         retries: int = 3,
         initial_delay: int = 1,
         connection_timeout: int = 1,
+        logger: Optional[logging.Logger] = None,
     ):
         """
         Initializes the ClientBuilder object.
@@ -23,6 +26,7 @@ class ClientBuilder:
             retries (int): The number of times to retry a failed request. Defaults to 3.
             initial_delay (int): The delay between retries in seconds. Defaults to 1.
             connection_timeout (int): The timeout for the connection in seconds. Defaults to 1.
+            logger (logging.Logger, optional): Custom logger instance used for diagnostic messages.
 
         Raises:
             ValueError: If endpoint is an empty string.
@@ -31,23 +35,25 @@ class ClientBuilder:
             ValueError: If connection_timeout is not a non-negative integer.
         """
 
+        self.logger = logger or logging.getLogger(__name__)
+
         if headers is None:
             headers = {}
         if endpoint == "":
             error_msg = "endpoint cannot be an empty string"
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             raise ValueError
         if not isinstance(retries, int) or retries < 0:
             error_msg = "retries must be a non-negative integer"
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             raise ValueError
         if not isinstance(initial_delay, int) or initial_delay < 0:
             error_msg = "initial_delay must be a non-negative integer"
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             raise ValueError
         if not isinstance(connection_timeout, int) or connection_timeout < 0:
             error_msg = "connection_timeout must be a non-negative integer"
-            logger.error(error_msg)
+            self.logger.error(error_msg)
             raise ValueError
 
         self.endpoint = endpoint

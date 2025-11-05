@@ -15,10 +15,15 @@ def client_setup():
 
 @pytest.fixture()
 def response_setup():
-    new_client = ClientBuilder(
-        endpoint="https://economia.awesomeapi.com.br/last/USD-BRL"
-    )
-    return new_client.get_api_data()
+    """Return a mocked response dictionary for DataFrame conversion tests."""
+
+    endpoint = "https://economia.awesomeapi.com.br/last/USD-BRL"
+    payload = {"USDBRL": {"code": "USD", "codein": "BRL", "bid": "5.0"}}
+
+    with responses.RequestsMock() as rsps:
+        rsps.add(responses.GET, endpoint, json=payload, status=200)
+        new_client = ClientBuilder(endpoint=endpoint)
+        yield new_client.get_api_data()
 
 
 def test_constructor_raises():
@@ -87,9 +92,16 @@ def test_constructor_with_retry_strategy():
     assert client.delay == 2
 
 
+@responses.activate
 def test_response_to_json(client_setup):  # pylint: disable=redefined-outer-name
+    """Ensure get_api_data returns a JSON dictionary when the call succeeds."""
+
+    endpoint = "https://economia.awesomeapi.com.br/last/USD-BRL"
+    expected_payload = {"USDBRL": {"code": "USD", "codein": "BRL"}}
+    responses.add(responses.GET, endpoint, json=expected_payload, status=200)
+
     new_client = client_setup
-    response = new_client.get_api_data()  # pylint: disable=protected-access
+    response = new_client.get_api_data()
     assert isinstance(response, dict)
 
 

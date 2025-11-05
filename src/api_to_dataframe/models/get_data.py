@@ -1,6 +1,7 @@
-import requests
+import logging
+
 import pandas as pd
-from api_to_dataframe.utils.logger import logger
+import requests
 
 
 class GetData:
@@ -21,7 +22,7 @@ class GetData:
         # Check if DataFrame is empty
         if df.empty:
             error_msg = "::: DataFrame is empty :::"
-            logger.error(error_msg)
+            logging.getLogger(__name__).error(error_msg)
             raise ValueError(error_msg)
 
         return df
