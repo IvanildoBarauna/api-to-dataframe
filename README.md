@@ -94,7 +94,7 @@ stream_handler = logging.StreamHandler()
 configure_logger(
     handlers=[stream_handler],
     level=logging.INFO,
-    format="%(asctime)s :: api-to-dataframe[%(levelname)s] :: %(message)s",
+    format="%(asctime)s :: api_to_dataframe[%(levelname)s] :: %(message)s",
 )
 
 custom_logger = logging.getLogger("my-app.api-client")

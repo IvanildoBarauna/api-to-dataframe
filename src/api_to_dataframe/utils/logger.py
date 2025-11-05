@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Iterable, Optional
 
-DEFAULT_LOGGER_NAME = "api-to-dataframe"
+DEFAULT_LOGGER_NAME = "api_to_dataframe"
 
 
 logger = logging.getLogger(DEFAULT_LOGGER_NAME)
