@@ -1,3 +1,5 @@
+from typing import Any, Callable, Optional, Sequence, Union
+
 from api_to_dataframe.models.retainer import retry_strategies, Strategies
 from api_to_dataframe.models.get_data import GetData
 from api_to_dataframe.utils.logger import logger
@@ -12,6 +14,7 @@ class ClientBuilder:
         retries: int = 3,
         initial_delay: int = 1,
         connection_timeout: int = 1,
+        transformer: Optional[Callable[[Any], Any]] = None,
     ):
         """
         Initializes the ClientBuilder object.
@@ -23,6 +26,8 @@ class ClientBuilder:
             retries (int): The number of times to retry a failed request. Defaults to 3.
             initial_delay (int): The delay between retries in seconds. Defaults to 1.
             connection_timeout (int): The timeout for the connection in seconds. Defaults to 1.
+            transformer (Optional[Callable[[Any], Any]]): Optional callable to
+                transform the JSON payload before DataFrame normalization.
 
         Raises:
             ValueError: If endpoint is an empty string.
@@ -56,6 +61,7 @@ class ClientBuilder:
         self.headers = headers
         self.retries = retries
         self.delay = initial_delay
+        self.transformer = transformer
 
     @retry_strategies
     def get_api_data(self):
@@ -77,19 +83,39 @@ class ClientBuilder:
 
         return response.json()
 
-    @staticmethod
-    def api_to_dataframe(response: dict):
-        """
-        Converts an API response to a DataFrame.
-
-        This function takes a dictionary response from an API,
-        uses the `to_dataframe` function from the `GetData` class
-        to convert it into a DataFrame, and logs the operation as successful.
+    def api_to_dataframe(
+        self,
+        response: Any,
+        *,
+        record_path: Optional[Union[str, Sequence[str]]] = None,
+        meta: Optional[Sequence[Union[str, Sequence[str]]]] = None,
+        errors: str = "raise",
+        max_level: Optional[int] = None,
+    ):
+        """Normalize an API response into a pandas DataFrame.
 
         Args:
-            response (dict): The dictionary containing the API response.
+            response (Any): The already decoded API response payload.
+            record_path (Optional[Union[str, Sequence[str]]]): Path to nested
+                records passed to :func:`pandas.json_normalize`.
+            meta (Optional[Sequence[Union[str, Sequence[str]]]]): Metadata keys to
+                include as columns in the result.
+            errors (str): Error handling strategy to forward to
+                :func:`pandas.json_normalize` ("raise" or "ignore").
+            max_level (Optional[int]): Maximum depth for record flattening.
 
         Returns:
-            DataFrame: A pandas DataFrame containing the data from the API response.
+            pandas.DataFrame: A DataFrame containing the normalized payload.
         """
-        return GetData.to_dataframe(response)
+
+        data = response
+        if self.transformer is not None:
+            data = self.transformer(response)
+
+        return GetData.to_dataframe(
+            data,
+            record_path=record_path,
+            meta=meta,
+            errors=errors,
+            max_level=max_level,
+        )

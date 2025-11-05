@@ -78,6 +78,47 @@ df = client.api_to_dataframe(data)
 print(df)
 ```
 
+### Normalization options
+
+`ClientBuilder.api_to_dataframe` accepts keyword arguments that are
+forwarded to [`pandas.json_normalize`](https://pandas.pydata.org/docs/reference/api/pandas.json_normalize.html).
+This makes it possible to flatten nested payloads and include metadata
+fields easily:
+
+```python
+payload = {
+    "meta": {"page": 1},
+    "items": [
+        {"id": 1, "value": "alpha"},
+        {"id": 2, "value": "beta"},
+    ],
+}
+
+client = ClientBuilder(endpoint="https://api.example.com")
+
+df = client.api_to_dataframe(
+    payload,
+    record_path="items",
+    meta=[["meta", "page"]],
+    errors="ignore",  # optionally avoid raising when paths are missing
+)
+```
+
+When complex transformations are required before normalization, provide a
+`transformer` callable to the constructor. The callable receives the JSON
+payload returned by `get_api_data` and can return any structure supported
+by `pandas.json_normalize`:
+
+```python
+client = ClientBuilder(
+    endpoint="https://api.example.com",
+    transformer=lambda payload: payload["data"],
+)
+
+data = client.get_api_data()
+df = client.api_to_dataframe(data)
+```
+
 ## Important notes:
 * **Opcionals Parameters:** The params timeout, retry_strategy and headers are opcionals.
 * **Default Params Value:** By default the quantity of retries is 3 and the time between retries is 1 second, but you can define manually.

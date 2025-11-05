@@ -1,5 +1,7 @@
-import pytest
+"""Tests for the ClientBuilder controller."""
+
 import pandas as pd
+import pytest
 import responses
 
 from api_to_dataframe import ClientBuilder, RetryStrategies
@@ -7,6 +9,8 @@ from api_to_dataframe import ClientBuilder, RetryStrategies
 
 @pytest.fixture()
 def client_setup():
+    """Provide a ClientBuilder instance for constructor related tests."""
+
     new_client = ClientBuilder(
         endpoint="https://economia.awesomeapi.com.br/last/USD-BRL"
     )
@@ -15,13 +19,17 @@ def client_setup():
 
 @pytest.fixture()
 def response_setup():
-    new_client = ClientBuilder(
-        endpoint="https://economia.awesomeapi.com.br/last/USD-BRL"
-    )
-    return new_client.get_api_data()
+    """Provide a simple payload used to build DataFrames."""
+
+    return [
+        {"code": "USD", "name": "Dollar"},
+        {"code": "BRL", "name": "Real"},
+    ]
 
 
 def test_constructor_raises():
+    """Ensure validation errors are raised for invalid constructor arguments."""
+
     with pytest.raises(ValueError):
         ClientBuilder(endpoint="")
 
@@ -59,6 +67,8 @@ def test_constructor_raises():
 
 
 def test_constructor_with_param(client_setup):  # pylint: disable=redefined-outer-name
+    """Ensure the endpoint argument is stored on the instance."""
+
     expected_result = "https://economia.awesomeapi.com.br/last/USD-BRL"
     new_client = client_setup
     assert new_client.endpoint == expected_result
@@ -87,14 +97,29 @@ def test_constructor_with_retry_strategy():
     assert client.delay == 2
 
 
+@responses.activate
 def test_response_to_json(client_setup):  # pylint: disable=redefined-outer-name
+    """Ensure the API response is decoded to JSON."""
+
     new_client = client_setup
+    endpoint = new_client.endpoint
+
+    responses.add(
+        responses.GET,
+        endpoint,
+        json={"status": "ok"},
+        status=200,
+    )
+
     response = new_client.get_api_data()  # pylint: disable=protected-access
     assert isinstance(response, dict)
 
 
 def test_to_dataframe(response_setup):  # pylint: disable=redefined-outer-name
-    df = ClientBuilder.api_to_dataframe(response_setup)
+    """Ensure responses are converted into DataFrames using instance method."""
+
+    client = ClientBuilder(endpoint="https://economia.awesomeapi.com.br/last/USD-BRL")
+    df = client.api_to_dataframe(response_setup)
     assert isinstance(df, pd.DataFrame)
 
 
@@ -118,3 +143,26 @@ def test_get_api_data_with_mocked_response():
     assert response == expected_data
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == endpoint
+
+
+def test_api_to_dataframe_supports_custom_normalization():
+    """Ensure normalization parameters are forwarded to the GetData helper."""
+
+    payload = {
+        "meta": {"page": 1},
+        "items": [
+            {"id": 1, "name": "First"},
+            {"id": 2, "name": "Second"},
+        ],
+    }
+
+    client = ClientBuilder(endpoint="https://economia.awesomeapi.com.br/last/USD-BRL")
+
+    dataframe = client.api_to_dataframe(
+        payload,
+        record_path="items",
+        meta=[["meta", "page"]],
+    )
+
+    assert list(dataframe.columns) == ["id", "name", "meta.page"]
+    assert dataframe.iloc[0]["meta.page"] == 1

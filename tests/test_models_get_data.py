@@ -1,99 +1,142 @@
+"""Tests for the GetData model utilities."""
+
+import json
+from typing import Any
+
+import pandas as pd
 import pytest
 import requests
 import responses
-import pandas as pd
-import json
 
-from api_to_dataframe.models.get_data import GetData
 from api_to_dataframe.controller.client_builder import ClientBuilder
+from api_to_dataframe.models.get_data import GetData
 
 
-def test_to_dataframe():
+def test_to_dataframe_rejects_empty_string() -> None:
+    """Ensure a string payload without data raises a ValueError."""
+
     with pytest.raises(ValueError):
         GetData.to_dataframe("")
 
 
-@responses.activate
-def test_to_emp_dataframe():
-    endpoint = "https://api.exemplo.com"
-    expected_response = {}
+def test_to_dataframe_rejects_empty_list_by_default() -> None:
+    """Validate that an empty iterable raises a ValueError when using default settings."""
 
-    responses.add(responses.GET, endpoint, json=expected_response, status=200)
+    with pytest.raises(ValueError):
+        GetData.to_dataframe([])
+
+
+def test_to_dataframe_allows_ignore_errors_for_empty_payload() -> None:
+    """Confirm that ignoring errors returns an empty DataFrame instead of raising."""
+
+    dataframe = GetData.to_dataframe([], errors="ignore")
+
+    assert isinstance(dataframe, pd.DataFrame)
+    assert dataframe.empty
+
+
+def test_to_dataframe_flattens_nested_structure() -> None:
+    """Check that nested dictionaries are flattened using pandas.json_normalize."""
+
+    payload = [
+        {"user": {"id": 1, "profile": {"name": "User1", "active": True}}},
+        {"user": {"id": 2, "profile": {"name": "User2", "active": False}}},
+    ]
+
+    dataframe = GetData.to_dataframe(payload, max_level=1)
+
+    assert list(dataframe.columns) == ["user.id", "user.profile"]
+    assert dataframe.iloc[0]["user.id"] == 1
+    assert dataframe.iloc[1]["user.profile"].get("name") == "User2"
+
+
+def test_to_dataframe_with_custom_record_path_and_meta() -> None:
+    """Ensure record_path and meta arguments are forwarded to pandas.json_normalize."""
+
+    payload = {
+        "metadata": {"batch": "A", "source": "unit-test"},
+        "items": [
+            {"id": 1, "value": "alpha"},
+            {"id": 2, "value": "beta"},
+        ],
+    }
+
+    dataframe = GetData.to_dataframe(
+        payload,
+        record_path="items",
+        meta=["metadata"],
+    )
+
+    assert "metadata" in dataframe.columns
+    assert dataframe.iloc[0]["metadata"]["batch"] == "A"
+    assert dataframe.iloc[1]["value"] == "beta"
+
+
+@responses.activate
+def test_to_dataframe_handles_nested_list_via_record_path() -> None:
+    """Validate normalization when the response is retrieved from the HTTP client."""
+
+    endpoint = "https://api.example.com/nested"
+    payload = {
+        "meta": {"page": 1},
+        "results": [
+            {"id": 1, "attributes": {"name": "Item1"}},
+            {"id": 2, "attributes": {"name": "Item2"}},
+        ],
+    }
+
+    responses.add(responses.GET, endpoint, json=payload, status=200)
 
     client = ClientBuilder(endpoint=endpoint)
     response = client.get_api_data()
 
-    with pytest.raises(ValueError):
-        GetData.to_dataframe(response)
+    dataframe = client.api_to_dataframe(
+        response,
+        record_path="results",
+        meta=[["meta", "page"]],
+    )
+
+    assert list(dataframe.columns) == ["id", "attributes.name", "meta.page"]
+    assert dataframe.iloc[0]["meta.page"] == 1
+    assert dataframe.iloc[1]["attributes.name"] == "Item2"
 
 
 @responses.activate
-def test_valid_dataframe_conversion():
-    """Test successful conversion of valid data to DataFrame"""
-    # A estrutura do dict afeta como o pandas cria o DataFrame
-    # Os dados precisam estar em uma lista para serem convertidos em linhas
-    valid_data = [{"id": 1, "name": "Test"}, {"id": 2, "name": "Test2"}]
-    df = GetData.to_dataframe(valid_data)
+def test_to_dataframe_supports_transformer_before_normalization() -> None:
+    """Check that ClientBuilder applies a transformer before delegating to GetData."""
 
-    assert isinstance(df, pd.DataFrame)
-    assert len(df) == 2
-    assert "id" in df.columns
-    assert "name" in df.columns
-    assert df.iloc[0]["id"] == 1
-    assert df.iloc[1]["name"] == "Test2"
+    endpoint = "https://api.example.com/items"
+    payload = {"data": [{"id": 1}, {"id": 2}]}
 
+    responses.add(responses.GET, endpoint, json=payload, status=200)
 
-@responses.activate
-def test_nested_data_conversion():
-    """Test conversion of nested data structures"""
-    # Lista de dicionários é mais adequado para converter em DataFrame
-    nested_data = [
-        {"user": {"id": 1, "profile": {"name": "User1"}}},
-        {"user": {"id": 2, "profile": {"name": "User2"}}}
-    ]
+    def transformer(raw: Any) -> Any:
+        return raw["data"]
 
-    # Convert to string and back to dict to simulate JSON response
-    json_str = json.dumps(nested_data)
-    response_list = json.loads(json_str)
+    client = ClientBuilder(endpoint=endpoint, transformer=transformer)
+    response = client.get_api_data()
 
-    df = GetData.to_dataframe(response_list)
-    assert isinstance(df, pd.DataFrame)
-    assert not df.empty
-    assert len(df) == 2
-    # Verificar estrutura das colunas
-    assert "user" in df.columns
+    dataframe = client.api_to_dataframe(response)
+
+    assert isinstance(dataframe, pd.DataFrame)
+    assert list(dataframe["id"]) == [1, 2]
 
 
 @responses.activate
-def test_http_error():
+def test_http_error() -> None:
+    """Ensure HTTP errors are propagated when the API returns a bad status."""
+
     endpoint = "https://api.exemplo.com"
-    expected_response = {}
-
-    responses.add(responses.GET, endpoint, json=expected_response, status=400)
+    responses.add(responses.GET, endpoint, json={}, status=400)
 
     with pytest.raises(requests.exceptions.HTTPError):
         GetData.get_response(endpoint=endpoint, headers={}, connection_timeout=10)
 
 
 @responses.activate
-def test_http_error_with_custom_message():
-    """Test HTTP error with custom error message in response"""
-    endpoint = "https://api.exemplo.com/error"
-    error_response = {"error": "Bad Request", "message": "Invalid parameters"}
+def test_timeout_error() -> None:
+    """Ensure timeout exceptions are surfaced to callers."""
 
-    responses.add(
-        responses.GET,
-        endpoint,
-        json=error_response,
-        status=400
-    )
-
-    with pytest.raises(requests.exceptions.HTTPError):
-        response = GetData.get_response(endpoint=endpoint, headers={}, connection_timeout=10)
-
-
-@responses.activate
-def test_timeout_error():
     endpoint = "https://api.exemplo.com"
 
     responses.add(responses.GET, endpoint, body=requests.exceptions.Timeout())
@@ -103,26 +146,27 @@ def test_timeout_error():
 
 
 @responses.activate
-def test_request_exception():
+def test_request_exception() -> None:
+    """Ensure generic request exceptions are raised when appropriate."""
+
     endpoint = "https://api.exemplo.com"
 
-    expected_response = {}
-
-    responses.add(responses.GET, endpoint, json=expected_response, status=500)
+    responses.add(responses.GET, endpoint, json={}, status=500)
 
     with pytest.raises(requests.exceptions.RequestException):
         GetData.get_response(endpoint=endpoint, headers={}, connection_timeout=10)
 
 
 @responses.activate
-def test_headers_passed_correctly():
-    """Test that headers are correctly passed to the request"""
+def test_headers_passed_correctly() -> None:
+    """Verify that custom headers are forwarded to the HTTP request."""
+
     endpoint = "https://api.exemplo.com/headers"
     expected_response = {"success": True}
     custom_headers = {
         "Authorization": "Bearer test-token",
         "X-Custom-Header": "test-value",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     def match_headers(request):
@@ -135,13 +179,13 @@ def test_headers_passed_correctly():
         responses.GET,
         endpoint,
         callback=match_headers,
-        content_type="application/json"
+        content_type="application/json",
     )
 
     response = GetData.get_response(
         endpoint=endpoint,
         headers=custom_headers,
-        connection_timeout=10
+        connection_timeout=10,
     )
 
     assert response.status_code == 200
