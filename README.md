@@ -78,6 +78,36 @@ df = client.api_to_dataframe(data)
 print(df)
 ```
 
+### Fluent authentication configuration
+
+The builder offers a fluent interface to configure authentication strategies. Any
+auth provider implementing the `AuthProvider` interface can be applied via
+`with_auth(...)` right before sending requests.
+
+```python
+from datetime import datetime, timedelta
+
+from api_to_dataframe import ClientBuilder
+from api_to_dataframe.models.auth import ApiKeyAuth, BearerTokenAuth
+
+
+client = ClientBuilder(endpoint="https://api.example.com").with_auth(
+    ApiKeyAuth("X-Api-Key", "static-key")
+)
+
+
+def fetch_token():
+    """Return a short-lived token and its expiry timestamp."""
+    return "dynamic-token", datetime.utcnow() + timedelta(minutes=5)
+
+
+secure_client = ClientBuilder(endpoint="https://secure.example.com").with_auth(
+    BearerTokenAuth(fetch_token, refresh_margin=60)
+)
+
+payload = secure_client.get_api_data()
+```
+
 ## Important notes:
 * **Opcionals Parameters:** The params timeout, retry_strategy and headers are opcionals.
 * **Default Params Value:** By default the quantity of retries is 3 and the time between retries is 1 second, but you can define manually.

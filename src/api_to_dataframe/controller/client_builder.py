@@ -1,3 +1,6 @@
+from typing import Optional
+
+from api_to_dataframe.models.auth import AuthProvider
 from api_to_dataframe.models.retainer import retry_strategies, Strategies
 from api_to_dataframe.models.get_data import GetData
 from api_to_dataframe.utils.logger import logger
@@ -53,9 +56,10 @@ class ClientBuilder:
         self.endpoint = endpoint
         self.retry_strategy = retry_strategy
         self.connection_timeout = connection_timeout
-        self.headers = headers
+        self.headers = dict(headers)
         self.retries = retries
         self.delay = initial_delay
+        self._auth_provider: Optional[AuthProvider] = None
 
     @retry_strategies
     def get_api_data(self):
@@ -69,13 +73,20 @@ class ClientBuilder:
         Returns:
             dict: The JSON response from the API as a dictionary.
         """
+        headers = self._compose_headers()
+
         response = GetData.get_response(
             endpoint=self.endpoint,
-            headers=self.headers,
+            headers=headers,
             connection_timeout=self.connection_timeout,
         )
 
         return response.json()
+
+    def with_auth(self, auth_provider: AuthProvider):
+        """Attach an authentication provider used to enrich request headers."""
+        self._auth_provider = auth_provider
+        return self
 
     @staticmethod
     def api_to_dataframe(response: dict):
@@ -93,3 +104,10 @@ class ClientBuilder:
             DataFrame: A pandas DataFrame containing the data from the API response.
         """
         return GetData.to_dataframe(response)
+
+    def _compose_headers(self) -> dict:
+        """Compose request headers including optional authentication details."""
+        composed_headers = dict(self.headers)
+        if self._auth_provider is not None:
+            composed_headers = self._auth_provider.apply(composed_headers)
+        return composed_headers
