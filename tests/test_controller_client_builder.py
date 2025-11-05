@@ -2,26 +2,20 @@ import pytest
 import pandas as pd
 import responses
 
-from api_to_dataframe import ClientBuilder, RetryStrategies
+from api_to_dataframe import ClientBuilder, DataFetchResult, RetryStrategies
 
 
 @pytest.fixture()
 def client_setup():
-    new_client = ClientBuilder(
-        endpoint="https://economia.awesomeapi.com.br/last/USD-BRL"
-    )
+    """Create a basic ClientBuilder instance for tests."""
+
+    new_client = ClientBuilder(endpoint="https://economia.awesomeapi.com.br/last/USD-BRL")
     return new_client
 
 
-@pytest.fixture()
-def response_setup():
-    new_client = ClientBuilder(
-        endpoint="https://economia.awesomeapi.com.br/last/USD-BRL"
-    )
-    return new_client.get_api_data()
-
-
 def test_constructor_raises():
+    """Validate constructor argument validation logic."""
+
     with pytest.raises(ValueError):
         ClientBuilder(endpoint="")
 
@@ -59,6 +53,8 @@ def test_constructor_raises():
 
 
 def test_constructor_with_param(client_setup):  # pylint: disable=redefined-outer-name
+    """Ensure constructor stores the provided endpoint."""
+
     expected_result = "https://economia.awesomeapi.com.br/last/USD-BRL"
     new_client = client_setup
     assert new_client.endpoint == expected_result
@@ -87,14 +83,35 @@ def test_constructor_with_retry_strategy():
     assert client.delay == 2
 
 
+@responses.activate
 def test_response_to_json(client_setup):  # pylint: disable=redefined-outer-name
+    """Ensure get_api_data returns a DataFetchResult."""
+
     new_client = client_setup
-    response = new_client.get_api_data()  # pylint: disable=protected-access
-    assert isinstance(response, dict)
+    responses.add(
+        responses.GET,
+        new_client.endpoint,
+        json={"mocked": True},
+        status=200,
+    )
+    response = new_client.get_api_data()
+    assert isinstance(response, DataFetchResult)
+    assert response.metadata["strategy"] == "single"
 
 
-def test_to_dataframe(response_setup):  # pylint: disable=redefined-outer-name
-    df = ClientBuilder.api_to_dataframe(response_setup)
+@responses.activate
+def test_to_dataframe():
+    """Convert aggregated API data to DataFrame."""
+
+    client = ClientBuilder(endpoint="https://economia.awesomeapi.com.br/last/USD-BRL")
+    responses.add(
+        responses.GET,
+        client.endpoint,
+        json=[{"value": 1}],
+        status=200,
+    )
+    response = client.get_api_data()
+    df = ClientBuilder.api_to_dataframe(response)
     assert isinstance(df, pd.DataFrame)
 
 
@@ -115,6 +132,17 @@ def test_get_api_data_with_mocked_response():
     client = ClientBuilder(endpoint=endpoint)
     response = client.get_api_data()
 
-    assert response == expected_data
+    assert isinstance(response, DataFetchResult)
+    assert response.as_records() == [expected_data]
     assert len(responses.calls) == 1
     assert responses.calls[0].request.url == endpoint
+
+
+@responses.activate
+def test_with_pagination_invalid_strategy_value():
+    """Raise ValueError when configuring an unknown pagination strategy."""
+
+    client = ClientBuilder(endpoint="https://api.test.com/data")
+
+    with pytest.raises(ValueError):
+        client.with_pagination("unknown")

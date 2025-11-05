@@ -1,44 +1,36 @@
-import pytest
-import responses
+"""Integration tests covering end-to-end flows."""
+
 import pandas as pd
+import responses
 
 from api_to_dataframe import ClientBuilder, RetryStrategies
 
 
 @responses.activate
 def test_full_flow_simple_api():
-    """Test the full flow from API request to DataFrame conversion with a simple API response"""
-    # Setup mock API
+    """Test the full flow from API request to DataFrame conversion with a simple API response."""
+
     endpoint = "https://api.example.com/data"
-    # Modificado para retornar lista diretamente, não encapsulado em dicionário
     api_response = [
         {"id": 1, "name": "Item 1", "price": 10.99},
         {"id": 2, "name": "Item 2", "price": 20.50},
-        {"id": 3, "name": "Item 3", "price": 5.25}
+        {"id": 3, "name": "Item 3", "price": 5.25},
     ]
 
-    responses.add(
-        responses.GET,
-        endpoint,
-        json=api_response,
-        status=200
-    )
+    responses.add(responses.GET, endpoint, json=api_response, status=200)
 
-    # Create client and fetch data
     client = ClientBuilder(
         endpoint=endpoint,
         retry_strategy=RetryStrategies.LINEAR_RETRY_STRATEGY,
         retries=3,
-        connection_timeout=5
+        connection_timeout=5,
     )
 
-    # Get API data
     response_data = client.get_api_data()
+    assert response_data.metadata["strategy"] == "single"
 
-    # Convert to DataFrame
     df = client.api_to_dataframe(response_data)
 
-    # Assertions
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 3
     assert "id" in df.columns
@@ -51,45 +43,27 @@ def test_full_flow_simple_api():
 
 @responses.activate
 def test_full_flow_with_retry():
-    """Test the full flow with a failed request that succeeds after retry"""
+    """Test the full flow with a failed request that succeeds after retry."""
+
     endpoint = "https://api.example.com/data/retry"
-    # Modificado para lista direta, similar ao teste anterior
-    api_response = [
-        {"id": 1, "value": "Success after retry"}
-    ]
+    api_response = [{"id": 1, "value": "Success after retry"}]
 
-    # Add a failing response first
-    responses.add(
-        responses.GET,
-        endpoint,
-        status=500,
-        json={"error": "Server Error"}
-    )
+    responses.add(responses.GET, endpoint, status=500, json={"error": "Server Error"})
+    responses.add(responses.GET, endpoint, json=api_response, status=200)
 
-    # Add a successful response for subsequent requests
-    responses.add(
-        responses.GET,
-        endpoint,
-        json=api_response,
-        status=200
-    )
-
-    # Create client with retry strategy
     client = ClientBuilder(
         endpoint=endpoint,
         retry_strategy=RetryStrategies.LINEAR_RETRY_STRATEGY,
         retries=3,
         initial_delay=1,
-        connection_timeout=5
+        connection_timeout=5,
     )
 
-    # Get API data - should succeed after retry
     response_data = client.get_api_data()
+    assert response_data.metadata["strategy"] == "single"
 
-    # Convert to DataFrame
     df = client.api_to_dataframe(response_data)
 
-    # Assertions
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert "id" in df.columns
@@ -97,5 +71,4 @@ def test_full_flow_with_retry():
     assert df.iloc[0]["id"] == 1
     assert df.iloc[0]["value"] == "Success after retry"
 
-    # Verify we had 2 calls (first failed, second succeeded)
     assert len(responses.calls) == 2

@@ -1,6 +1,7 @@
 import time
-import requests
+
 import pytest
+import requests
 
 from api_to_dataframe import ClientBuilder, RetryStrategies
 
@@ -8,6 +9,7 @@ from api_to_dataframe import ClientBuilder, RetryStrategies
 
 
 def test_linear_strategy():
+    """Ensure linear retry strategy waits the configured delay."""
     endpoint = "https://api-to-dataframe/"
     max_retries = 2
     client = ClientBuilder(
@@ -33,6 +35,7 @@ def test_linear_strategy():
 
 
 def test_no_retry_strategy():
+    """Verify that no retry strategy propagates the first exception."""
     endpoint = "https://api-to-dataframe/"
     client = ClientBuilder(
         endpoint=endpoint,
@@ -44,6 +47,7 @@ def test_no_retry_strategy():
 
 
 def test_exponential_strategy():
+    """Validate exponential backoff increases delay per retry."""
     endpoint = "https://api-to-dataframe/"
     max_retries = 2
     client = ClientBuilder(

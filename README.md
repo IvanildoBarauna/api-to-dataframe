@@ -45,7 +45,7 @@ poetry add api-to-dataframe
 
 ``` python
 ## Importing library
-from api_to_dataframe import ClientBuilder, RetryStrategies
+from api_to_dataframe import ClientBuilder, PaginationStrategy, RetryStrategies
 
 # Create a client for simple ingest data from API (timeout 1 second)
 client = ClientBuilder(endpoint="https://api.example.com")
@@ -77,6 +77,30 @@ df = client.api_to_dataframe(data)
 # Display the DataFrame
 print(df)
 ```
+
+### Working with pagination
+
+```python
+from api_to_dataframe import ClientBuilder, PaginationStrategy
+
+client = ClientBuilder(endpoint="https://api.example.com/resources")
+
+result = client.with_pagination(
+    PaginationStrategy.OFFSET_LIMIT,
+    limit=100,
+    results_key="items",
+).get_api_data()
+
+print(result.metadata["pages"])  # total pages retrieved
+records = result.as_records()
+dataframe = ClientBuilder.api_to_dataframe(result)
+```
+
+Each call to `get_api_data` returns a `DataFetchResult` object containing:
+
+* `payloads`: the raw response for every page requested;
+* `records`: flattened records suitable for DataFrame conversion;
+* `metadata`: strategy details such as the number of pages fetched and the last pagination parameters used.
 
 ## Important notes:
 * **Opcionals Parameters:** The params timeout, retry_strategy and headers are opcionals.

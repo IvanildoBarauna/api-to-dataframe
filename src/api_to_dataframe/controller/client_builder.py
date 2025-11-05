@@ -1,5 +1,17 @@
+from copy import deepcopy
+from typing import Any, Dict, Iterator, List, Optional, Union
+
 from api_to_dataframe.models.retainer import retry_strategies, Strategies
 from api_to_dataframe.models.get_data import GetData
+from api_to_dataframe.models.pagination import (
+    DataFetchResult,
+    PaginationConfig,
+    PaginationStrategy,
+    PaginationStep,
+    cursor_iterator,
+    offset_limit_iterator,
+    page_iterator,
+)
 from api_to_dataframe.utils.logger import logger
 
 
@@ -56,6 +68,46 @@ class ClientBuilder:
         self.headers = headers
         self.retries = retries
         self.delay = initial_delay
+        self.pagination_config: Optional[PaginationConfig] = None
+
+    def with_pagination(self, strategy: Union[PaginationStrategy, str], **strategy_kwargs) -> "ClientBuilder":
+        """Configure pagination metadata to be used when fetching data."""
+
+        if isinstance(strategy, PaginationStrategy):
+            strategy_value = strategy
+        elif isinstance(strategy, str):
+            try:
+                strategy_value = PaginationStrategy(strategy.lower())
+            except ValueError as exc:
+                error_msg = (
+                    "Unsupported pagination strategy. Use one of: "
+                    f"{', '.join(item.value for item in PaginationStrategy)}"
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg) from exc
+        else:
+            error_msg = "Strategy must be a PaginationStrategy or string value"
+            logger.error(error_msg)
+            raise TypeError(error_msg)
+
+        if strategy_value == PaginationStrategy.OFFSET_LIMIT:
+            limit = strategy_kwargs.get("limit")
+            if limit is None or not isinstance(limit, int) or limit <= 0:
+                error_msg = "Offset/limit strategy requires a positive integer 'limit'"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+        if strategy_value == PaginationStrategy.PAGE:
+            start_page = strategy_kwargs.get("start_page", 1)
+            if not isinstance(start_page, int) or start_page <= 0:
+                error_msg = "Page strategy requires a positive integer 'start_page'"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+        self.pagination_config = PaginationConfig(
+            strategy=strategy_value,
+            params=deepcopy(strategy_kwargs),
+        )
+        return self
 
     @retry_strategies
     def get_api_data(self):
@@ -69,16 +121,49 @@ class ClientBuilder:
         Returns:
             dict: The JSON response from the API as a dictionary.
         """
-        response = GetData.get_response(
-            endpoint=self.endpoint,
-            headers=self.headers,
-            connection_timeout=self.connection_timeout,
-        )
+        if self.pagination_config is None:
+            response = GetData.get_response(
+                endpoint=self.endpoint,
+                headers=self.headers,
+                connection_timeout=self.connection_timeout,
+            )
+            payload = response.json()
+            return DataFetchResult(
+                payloads=[payload],
+                records=_normalise_records(payload, results_key=None),
+                metadata={"strategy": "single", "pages": 1},
+            )
 
-        return response.json()
+        iterator = self._build_iterator()
+        payloads = []
+        records = []
+        metadata: Dict[str, Any] = {
+            "strategy": self.pagination_config.strategy.value,
+            "params": deepcopy(self.pagination_config.params),
+            "pages": 0,
+        }
+        results_key = self.pagination_config.params.get("results_key")
+        last_params: Optional[Dict[str, Any]] = None
+        last_cursor: Optional[str] = None
+
+        for step in iterator:
+            payloads.append(step.payload)
+            metadata["pages"] += 1
+            last_params = step.params
+            last_cursor = step.cursor
+
+            step_records = _normalise_records(step.payload, results_key=results_key)
+            records.extend(step_records)
+
+        if last_params is not None:
+            metadata["last_params"] = last_params
+        if self.pagination_config.strategy == PaginationStrategy.CURSOR:
+            metadata["last_cursor"] = last_cursor
+
+        return DataFetchResult(payloads=payloads, records=records, metadata=metadata)
 
     @staticmethod
-    def api_to_dataframe(response: dict):
+    def api_to_dataframe(response: Any):
         """
         Converts an API response to a DataFrame.
 
@@ -92,4 +177,49 @@ class ClientBuilder:
         Returns:
             DataFrame: A pandas DataFrame containing the data from the API response.
         """
-        return GetData.to_dataframe(response)
+        if isinstance(response, DataFetchResult):
+            records = response.as_records()
+        else:
+            records = response
+
+        return GetData.to_dataframe(records)
+
+    def _build_iterator(self) -> Iterator[PaginationStep]:
+        """Create the configured pagination iterator."""
+
+        assert self.pagination_config is not None  # for mypy style checking
+        fetch_page = self._fetch_page
+        params = self.pagination_config.params
+
+        if self.pagination_config.strategy == PaginationStrategy.OFFSET_LIMIT:
+            return offset_limit_iterator(fetch_page, **params)
+        if self.pagination_config.strategy == PaginationStrategy.PAGE:
+            return page_iterator(fetch_page, **params)
+        if self.pagination_config.strategy == PaginationStrategy.CURSOR:
+            return cursor_iterator(fetch_page, **params)
+
+        error_msg = "Unsupported pagination strategy configured"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    def _fetch_page(self, params: Dict[str, Any]) -> Any:
+        """Fetch a single page applying the current pagination parameters."""
+
+        response = GetData.get_response(
+            endpoint=self.endpoint,
+            headers=self.headers,
+            connection_timeout=self.connection_timeout,
+            params=params if params else None,
+        )
+        return response.json()
+
+
+def _normalise_records(payload: Any, results_key: Optional[str]) -> List[Any]:
+    """Normalise payloads into a list of records."""
+
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict) and results_key is not None:
+        records = payload.get(results_key, [])
+        return records if isinstance(records, list) else []
+    return [payload]

@@ -1,30 +1,38 @@
+import json
+
+import pandas as pd
 import pytest
 import requests
 import responses
-import pandas as pd
-import json
 
-from api_to_dataframe.models.get_data import GetData
+from api_to_dataframe import DataFetchResult
 from api_to_dataframe.controller.client_builder import ClientBuilder
+from api_to_dataframe.models.get_data import GetData
 
 
 def test_to_dataframe():
+    """Raise ValueError when provided with empty input data."""
+
     with pytest.raises(ValueError):
         GetData.to_dataframe("")
 
 
 @responses.activate
 def test_to_emp_dataframe():
+    """Propagate empty API payloads as dataframe errors."""
+
     endpoint = "https://api.exemplo.com"
-    expected_response = {}
+    expected_response = []
 
     responses.add(responses.GET, endpoint, json=expected_response, status=200)
 
     client = ClientBuilder(endpoint=endpoint)
     response = client.get_api_data()
 
+    assert isinstance(response, DataFetchResult)
+
     with pytest.raises(ValueError):
-        GetData.to_dataframe(response)
+        GetData.to_dataframe(response.as_records())
 
 
 @responses.activate
@@ -66,6 +74,8 @@ def test_nested_data_conversion():
 
 @responses.activate
 def test_http_error():
+    """Ensure HTTP errors raise the expected exception type."""
+
     endpoint = "https://api.exemplo.com"
     expected_response = {}
 
@@ -94,6 +104,8 @@ def test_http_error_with_custom_message():
 
 @responses.activate
 def test_timeout_error():
+    """Surface timeout exceptions raised by the requests layer."""
+
     endpoint = "https://api.exemplo.com"
 
     responses.add(responses.GET, endpoint, body=requests.exceptions.Timeout())
@@ -104,6 +116,8 @@ def test_timeout_error():
 
 @responses.activate
 def test_request_exception():
+    """Propagate generic request exceptions from the HTTP client."""
+
     endpoint = "https://api.exemplo.com"
 
     expected_response = {}
@@ -142,6 +156,32 @@ def test_headers_passed_correctly():
         endpoint=endpoint,
         headers=custom_headers,
         connection_timeout=10
+    )
+
+    assert response.status_code == 200
+    assert response.json() == expected_response
+
+
+@responses.activate
+def test_query_params_are_forwarded():
+    """Ensure query parameters are forwarded to the underlying request."""
+
+    endpoint = "https://api.exemplo.com/params"
+    expected_response = {"success": True}
+
+    responses.add(
+        responses.GET,
+        endpoint,
+        json=expected_response,
+        match=[responses.matchers.query_param_matcher({"offset": "10", "limit": "5"})],
+        status=200,
+    )
+
+    response = GetData.get_response(
+        endpoint=endpoint,
+        headers={},
+        connection_timeout=10,
+        params={"offset": 10, "limit": 5},
     )
 
     assert response.status_code == 200

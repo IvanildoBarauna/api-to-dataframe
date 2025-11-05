@@ -1,3 +1,5 @@
+from typing import Optional
+
 import requests
 import pandas as pd
 from api_to_dataframe.utils.logger import logger
@@ -5,9 +7,15 @@ from api_to_dataframe.utils.logger import logger
 
 class GetData:
     @staticmethod
-    def get_response(endpoint: str, headers: dict, connection_timeout: int):
+    def get_response(endpoint: str, headers: dict, connection_timeout: int, params: Optional[dict] = None):
+        """Execute a GET request against the target endpoint."""
         # Make the request
-        response = requests.get(endpoint, timeout=connection_timeout, headers=headers)
+        response = requests.get(
+            endpoint,
+            timeout=connection_timeout,
+            headers=headers,
+            params=params,
+        )
 
         # Attempt to raise for status to catch errors
         response.raise_for_status()
