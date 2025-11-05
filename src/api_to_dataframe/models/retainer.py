@@ -1,3 +1,4 @@
+import random
 import time
 from enum import Enum
 
@@ -15,11 +16,15 @@ class Strategies(Enum):
 def retry_strategies(func):
     def wrapper(*args, **kwargs):  # pylint: disable=inconsistent-return-statements
         retry_number = 0
-        while retry_number < args[0].retries:
+        max_allowed_retries = min(args[0].retries, Constants.MAX_OF_RETRIES)
+        while retry_number < max_allowed_retries:
             try:
                 if retry_number > 0:
                     logger.info(
-                        f"Trying for the {retry_number} of {Constants.MAX_OF_RETRIES} retries. Using {args[0].retry_strategy}"
+                        "Trying for the %s of %s retries. Using %s",
+                        retry_number,
+                        max_allowed_retries,
+                        args[0].retry_strategy,
                     )
                 return func(*args, **kwargs)
             except RequestException as e:
@@ -30,10 +35,13 @@ def retry_strategies(func):
                 if args[0].retry_strategy == Strategies.LINEAR_RETRY_STRATEGY:
                     time.sleep(args[0].delay)
                 elif args[0].retry_strategy == Strategies.EXPONENTIAL_RETRY_STRATEGY:
-                    time.sleep(args[0].delay * retry_number)
+                    jitter = 0.0
+                    if getattr(args[0], "jitter", 0) > 0:
+                        jitter = random.uniform(0, args[0].jitter)
+                    time.sleep(args[0].delay * retry_number + jitter)
 
-                if retry_number in (args[0].retries, Constants.MAX_OF_RETRIES):
-                    logger.error(f"Failed after {retry_number} retries")
+                if retry_number >= max_allowed_retries:
+                    logger.error("Failed after %s retries", retry_number)
                     raise e
 
     return wrapper

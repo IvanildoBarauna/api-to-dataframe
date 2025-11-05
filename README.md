@@ -65,7 +65,8 @@ client = ClientBuilder(endpoint="https://api.example.com"
                         ,connection_timeout=10
                         ,headers=headers
                         ,retries=5
-                        ,initial_delay=10)
+                        ,initial_delay=10
+                        ,jitter=0.5)
 
 
 # Get data from the API
@@ -79,10 +80,11 @@ print(df)
 ```
 
 ## Important notes:
-* **Opcionals Parameters:** The params timeout, retry_strategy and headers are opcionals.
+* **Opcionals Parameters:** The params timeout, retry_strategy, headers and jitter are opcionals.
 * **Default Params Value:** By default the quantity of retries is 3 and the time between retries is 1 second, but you can define manually.
-* **Max Of Retries:** For security of API Server there is a limit for quantity of retries, actually this value is 5, this value is defined in lib constant. You can inform any value in RETRIES param, but the lib only will try 5x.
+* **Max Of Retries:** For security of API Server there is a limit for quantity of retries, actually this value is 5, this value is defined in lib constant. You can inform any value in RETRIES param, but the lib only will try 5x and will log a warning if a higher value is informed.
 * **Exponential Retry Strategy:** The increment of time between retries is time passed in **initial_delay** param * 2 * the retry_number, e.g with initial_delay=2
+* **Jitter Parameter:** When using the exponential strategy you can define a **jitter** value to add a random wait time between 0 and the informed jitter. This helps to avoid thundering herd effects.
 
     RetryNumber  | WaitingTime
     ------------ | -----------

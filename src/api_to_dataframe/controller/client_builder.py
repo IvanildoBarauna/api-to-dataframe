@@ -1,5 +1,6 @@
 from api_to_dataframe.models.retainer import retry_strategies, Strategies
 from api_to_dataframe.models.get_data import GetData
+from api_to_dataframe.utils import Constants
 from api_to_dataframe.utils.logger import logger
 
 
@@ -12,6 +13,7 @@ class ClientBuilder:
         retries: int = 3,
         initial_delay: int = 1,
         connection_timeout: int = 1,
+        jitter: float = 0.0,
     ):
         """
         Initializes the ClientBuilder object.
@@ -23,12 +25,14 @@ class ClientBuilder:
             retries (int): The number of times to retry a failed request. Defaults to 3.
             initial_delay (int): The delay between retries in seconds. Defaults to 1.
             connection_timeout (int): The timeout for the connection in seconds. Defaults to 1.
+            jitter (float): Additional random jitter in seconds applied to exponential retries.
 
         Raises:
             ValueError: If endpoint is an empty string.
             ValueError: If retries is not a non-negative integer.
             ValueError: If delay is not a non-negative integer.
             ValueError: If connection_timeout is not a non-negative integer.
+            ValueError: If jitter is negative or not a numeric value.
         """
 
         if headers is None:
@@ -49,13 +53,25 @@ class ClientBuilder:
             error_msg = "connection_timeout must be a non-negative integer"
             logger.error(error_msg)
             raise ValueError
+        if not isinstance(jitter, (int, float)) or jitter < 0:
+            error_msg = "jitter must be a non-negative number"
+            logger.error(error_msg)
+            raise ValueError
 
         self.endpoint = endpoint
         self.retry_strategy = retry_strategy
         self.connection_timeout = connection_timeout
         self.headers = headers
-        self.retries = retries
+        clamped_retries = min(retries, Constants.MAX_OF_RETRIES)
+        if retries != clamped_retries:
+            logger.warning(
+                "Retry count %s exceeds global maximum of %s. Clamping to the allowed value.",
+                retries,
+                Constants.MAX_OF_RETRIES,
+            )
+        self.retries = clamped_retries
         self.delay = initial_delay
+        self.jitter = float(jitter)
 
     @retry_strategies
     def get_api_data(self):
