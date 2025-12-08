@@ -34,7 +34,7 @@ pytest = "^8.2.2"
 coverage = "^7.5.3"
 responses = "^0.25.3"
 pylint = "^3.2.5"
-black = "^24.4.2"
+black = ">=24.4.2,<26.0.0"
 
 
 [build-system]
