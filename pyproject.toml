@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "api-to-dataframe"
-version = "2.0.4"
+version = "2.0.5"
 description = "A package to convert API responses to pandas dataframe"
 authors = ["IvanildoBarauna <ivanildo.jnr@outlook.com>"]
 readme = "README.md"
@@ -35,6 +35,7 @@ coverage = "^7.5.3"
 responses = "^0.25.3"
 pylint = "^3.2.5"
 black = "^24.4.2"
+pytest-cov = "^7.0.0"
 
 
 [build-system]
