@@ -4,8 +4,6 @@ import pytest
 
 from api_to_dataframe import ClientBuilder, RetryStrategies
 
-# from api_to_dataframe.utils import Constants
-
 
 def test_linear_strategy():
     endpoint = "https://api-to-dataframe/"
