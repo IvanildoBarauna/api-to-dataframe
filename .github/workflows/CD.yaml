@@ -1,52 +1,15 @@
 name: Publish Python Package
+
 on:
   pull_request:
     types: [closed]
     branches: [ "main" ]
-permissions:
-  contents: write
+  workflow_dispatch:
+
 jobs:
   publish:
-    name: Build and publish to PyPI
-    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'deployable')
-    runs-on: ubuntu-latest
-    environment: Production
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.merge_commit_sha }}
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        version: 1.6.1
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-    - name: Install dependencies
-      run: poetry install --no-interaction
-    - name: Extract version
-      id: extract_version
-      run: |
-        VERSION=$(poetry version -s)
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-    - name: Build package
-      run: poetry build
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ steps.extract_version.outputs.version }}
-        name: Release v${{ steps.extract_version.outputs.version }}
-        draft: false
-        prerelease: false
-        files: dist/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Publish to PyPI
-      run: |
-        poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
-        poetry publish
-      env:
-        PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+    uses: ivanildobarauna/github-workflows/.github/workflows/publish-python-package.yml@v1
+    with:
+      python-version: "3.10"
+    secrets:
+      PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}

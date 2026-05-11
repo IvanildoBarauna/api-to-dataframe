@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "api-to-dataframe"
-version = "2.1.0"
+version = "2.2.0"
 description = "A package to convert API responses to pandas dataframe"
 authors = ["IvanildoBarauna <ivanildo.jnr@outlook.com>"]
 readme = "README.md"
