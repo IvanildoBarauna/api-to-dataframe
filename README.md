@@ -1,103 +1,67 @@
 # API to DataFrame
-Python library that simplifies obtaining data from API endpoints by converting them directly into Pandas DataFrames. This library offers robust features, including retry strategies for failed requests.
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ivanildobarauna-dev/api-to-dataframe)
+Fetch JSON from any HTTP API and turn it into a pandas DataFrame in two calls — with optional retry strategies.
 
-
-[![PyPI - Status](https://img.shields.io/pypi/status/api-to-dataframe?style=for-the-badge&logo=pypi)](https://pypi.org/project/api-to-dataframe/)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/api-to-dataframe?style=for-the-badge&logo=pypi)](https://pypi.org/project/api-to-dataframe/)
 [![PyPI - Version](https://img.shields.io/pypi/v/api-to-dataframe?style=for-the-badge&logo=pypi)](https://pypi.org/project/api-to-dataframe/#history)
-
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/api-to-dataframe?style=for-the-badge&logo=python)
-
-[![CI](https://img.shields.io/github/actions/workflow/status/ivanildobarauna-dev/api-to-dataframe/CI.yaml?&style=for-the-badge&logo=githubactions&cacheSeconds=60&label=Tests+and+pre+build)](https://github.com/ivanildobarauna-dev/api-to-dataframe/actions/workflows/CI.yaml)
-[![CD](https://img.shields.io/github/actions/workflow/status/ivanildobarauna-dev/api-to-dataframe/CD.yaml?&style=for-the-badge&logo=githubactions&cacheSeconds=60&event=release&label=Package_publication)](https://github.com/ivanildobarauna-dev/api-to-dataframe/actions/workflows/CD.yaml)
-
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/api-to-dataframe?style=for-the-badge&logo=pypi)](https://pypi.org/project/api-to-dataframe/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/api-to-dataframe?style=for-the-badge&logo=python)](https://pypi.org/project/api-to-dataframe/)
+[![CI](https://img.shields.io/github/actions/workflow/status/ivanildobarauna-dev/api-to-dataframe/CI.yaml?style=for-the-badge&logo=githubactions&label=CI)](https://github.com/ivanildobarauna-dev/api-to-dataframe/actions/workflows/CI.yaml)
 [![Codecov](https://img.shields.io/codecov/c/github/ivanildobarauna-dev/api-to-dataframe?style=for-the-badge&logo=codecov)](https://app.codecov.io/gh/ivanildobarauna-dev/api-to-dataframe)
 
-## Project Stack
-
-![Python](https://img.shields.io/badge/-Python-05122A?style=flat&logo=python)&nbsp;
-![Docker](https://img.shields.io/badge/-Docker-05122A?style=flat&logo=docker)&nbsp;
-![Poetry](https://img.shields.io/badge/-Poetry-05122A?style=flat&logo=poetry)&nbsp;
-![GitHub Actions](https://img.shields.io/badge/-GitHub_Actions-05122A?style=flat&logo=githubactions)&nbsp;
-![CodeCov](https://img.shields.io/badge/-CodeCov-05122A?style=flat&logo=codecov)&nbsp;
-![pypi](https://img.shields.io/badge/-pypi-05122A?style=flat&logo=pypi)&nbsp;
-![pandas](https://img.shields.io/badge/-pandas-05122A?style=flat&logo=pandas)&nbsp;
-![pytest](https://img.shields.io/badge/-pytest-05122A?style=flat&logo=pytest)&nbsp;
-
-
-## Installation
-
-To install the package using pip, use the following command:
+## Install
 
 ```sh
 pip install api-to-dataframe
-```
-
-To install the package using poetry, use the following command:
-
-```sh
+# or
 poetry add api-to-dataframe
 ```
 
-## User Guide
+Requires Python 3.10+.
 
-``` python
-## Importing library
+## Quick start
+
+```python
 from api_to_dataframe import ClientBuilder, RetryStrategies
 
-# Create a client for simple ingest data from API (timeout 1 second)
-client = ClientBuilder(endpoint="https://api.example.com")
-
-# if you can define timeout with LINEAR_RETRY_STRATEGY and set headers:
-headers = {
-    "application_name": "api_to_dataframe"
-}
-client = ClientBuilder(endpoint="https://api.example.com"
-                        ,retry_strategy=RetryStrategies.LINEAR_RETRY_STRATEGY
-                        ,connection_timeout=2
-                        ,headers=headers)
-
-# if you can define timeout with EXPONENTIAL_RETRY_STRATEGY and set headers:
-client = ClientBuilder(endpoint="https://api.example.com"
-                        ,retry_strategy=RetryStrategies.EXPONENTIAL_RETRY_STRATEGY
-                        ,connection_timeout=10
-                        ,headers=headers
-                        ,retries=5
-                        ,initial_delay=10)
-
-
-# Get data from the API
+client = ClientBuilder(endpoint="https://api.example.com/items")
 data = client.get_api_data()
-
-# Convert the data to a DataFrame
 df = client.api_to_dataframe(data)
-
-# Display the DataFrame
-print(df)
 ```
 
-## Important notes:
-* **Opcionals Parameters:** The params timeout, retry_strategy and headers are opcionals.
-* **Default Params Value:** By default the quantity of retries is 3 and the time between retries is 1 second, but you can define manually.
-* **Max Of Retries:** For security of API Server there is a limit for quantity of retries, actually this value is 5, this value is defined in lib constant. You can inform any value in RETRIES param, but the lib only will try 5x.
-* **Exponential Retry Strategy:** The increment of time between retries is time passed in **initial_delay** param * 2 * the retry_number, e.g with initial_delay=2
+`api_to_dataframe` expects the response to be a list of dicts. An empty result raises `ValueError`.
 
-    RetryNumber  | WaitingTime
-    ------------ | -----------
-    2            |  2s
-    2            |  4s
-    3            |  6s
-    4            |  8s
-    5            |  10s
-* **Linear Retry Strategy:** The increment of time between retries is time passed in **initial_delay**
-e.g with initial_delay=2
+## Configuration
 
-    RetryNumber  | WaitingTime
-    ------------ | -----------
-    1            |  2s
-    2            |  2s
-    3            |  2s
-    4            |  2s
-    5            |  2s
+```python
+client = ClientBuilder(
+    endpoint="https://api.example.com/items",
+    headers={"Authorization": "Bearer ..."},
+    retry_strategy=RetryStrategies.EXPONENTIAL_RETRY_STRATEGY,
+    retries=5,
+    initial_delay=2,
+    connection_timeout=10,
+)
+```
+
+| Parameter            | Default              | Description                                         |
+| -------------------- | -------------------- | --------------------------------------------------- |
+| `endpoint`           | — (required)         | Target URL.                                         |
+| `headers`            | `None`               | Request headers.                                    |
+| `retry_strategy`     | `NO_RETRY_STRATEGY`  | See strategies below.                               |
+| `retries`            | `3`                  | Max attempts. Hard-capped at 5.                     |
+| `initial_delay`      | `1`                  | Base delay in seconds between retries.              |
+| `connection_timeout` | `10`                 | Per-request timeout in seconds.                     |
+
+## Retry strategies
+
+- `NO_RETRY_STRATEGY` — fail fast on the first error.
+- `LINEAR_RETRY_STRATEGY` — wait `initial_delay` seconds before each retry.
+- `EXPONENTIAL_RETRY_STRATEGY` — wait `initial_delay * retry_number` seconds before each retry.
+
+Retries are capped at 5 regardless of the `retries` value.
+
+## Links
+
+- [PyPI](https://pypi.org/project/api-to-dataframe/)
+- [Example notebook](https://github.com/IvanildoBarauna/api-to-dataframe/blob/main/notebooks/example.ipynb)
+- [Issues](https://github.com/IvanildoBarauna/api-to-dataframe/issues)
