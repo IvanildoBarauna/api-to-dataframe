@@ -14,22 +14,17 @@ def test_full_flow_simple_api():
     api_response = [
         {"id": 1, "name": "Item 1", "price": 10.99},
         {"id": 2, "name": "Item 2", "price": 20.50},
-        {"id": 3, "name": "Item 3", "price": 5.25}
+        {"id": 3, "name": "Item 3", "price": 5.25},
     ]
 
-    responses.add(
-        responses.GET,
-        endpoint,
-        json=api_response,
-        status=200
-    )
+    responses.add(responses.GET, endpoint, json=api_response, status=200)
 
     # Create client and fetch data
     client = ClientBuilder(
         endpoint=endpoint,
         retry_strategy=RetryStrategies.LINEAR_RETRY_STRATEGY,
         retries=3,
-        connection_timeout=5
+        connection_timeout=5,
     )
 
     # Get API data
@@ -54,25 +49,13 @@ def test_full_flow_with_retry():
     """Test the full flow with a failed request that succeeds after retry"""
     endpoint = "https://api.example.com/data/retry"
     # Modificado para lista direta, similar ao teste anterior
-    api_response = [
-        {"id": 1, "value": "Success after retry"}
-    ]
+    api_response = [{"id": 1, "value": "Success after retry"}]
 
     # Add a failing response first
-    responses.add(
-        responses.GET,
-        endpoint,
-        status=500,
-        json={"error": "Server Error"}
-    )
+    responses.add(responses.GET, endpoint, status=500, json={"error": "Server Error"})
 
     # Add a successful response for subsequent requests
-    responses.add(
-        responses.GET,
-        endpoint,
-        json=api_response,
-        status=200
-    )
+    responses.add(responses.GET, endpoint, json=api_response, status=200)
 
     # Create client with retry strategy
     client = ClientBuilder(
@@ -80,7 +63,7 @@ def test_full_flow_with_retry():
         retry_strategy=RetryStrategies.LINEAR_RETRY_STRATEGY,
         retries=3,
         initial_delay=1,
-        connection_timeout=5
+        connection_timeout=5,
     )
 
     # Get API data - should succeed after retry

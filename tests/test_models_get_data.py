@@ -49,7 +49,7 @@ def test_nested_data_conversion():
     # Lista de dicionários é mais adequado para converter em DataFrame
     nested_data = [
         {"user": {"id": 1, "profile": {"name": "User1"}}},
-        {"user": {"id": 2, "profile": {"name": "User2"}}}
+        {"user": {"id": 2, "profile": {"name": "User2"}}},
     ]
 
     # Convert to string and back to dict to simulate JSON response
@@ -81,15 +81,12 @@ def test_http_error_with_custom_message():
     endpoint = "https://api.exemplo.com/error"
     error_response = {"error": "Bad Request", "message": "Invalid parameters"}
 
-    responses.add(
-        responses.GET,
-        endpoint,
-        json=error_response,
-        status=400
-    )
+    responses.add(responses.GET, endpoint, json=error_response, status=400)
 
     with pytest.raises(requests.exceptions.HTTPError):
-        response = GetData.get_response(endpoint=endpoint, headers={}, connection_timeout=10)
+        response = GetData.get_response(
+            endpoint=endpoint, headers={}, connection_timeout=10
+        )
 
 
 @responses.activate
@@ -122,7 +119,7 @@ def test_headers_passed_correctly():
     custom_headers = {
         "Authorization": "Bearer test-token",
         "X-Custom-Header": "test-value",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     def match_headers(request):
@@ -132,16 +129,11 @@ def test_headers_passed_correctly():
         return (200, {}, json.dumps(expected_response))
 
     responses.add_callback(
-        responses.GET,
-        endpoint,
-        callback=match_headers,
-        content_type="application/json"
+        responses.GET, endpoint, callback=match_headers, content_type="application/json"
     )
 
     response = GetData.get_response(
-        endpoint=endpoint,
-        headers=custom_headers,
-        connection_timeout=10
+        endpoint=endpoint, headers=custom_headers, connection_timeout=10
     )
 
     assert response.status_code == 200

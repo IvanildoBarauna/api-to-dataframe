@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. Dates are displayed in UTC.
 
+#### [2.2.3](https://github.com/IvanildoBarauna/api-to-dataframe/compare/v2.2.2...v2.2.3)
+
+> 21 October 2026
+
+- chore: consolidate dependency updates from PRs #156, #160, #164, #165, #166, #167, #169, #170, and #171; retain the requests 2.34.2 and pytest 9.1.1 updates already present on main
+- chore: update urllib3 to 2.8.0, idna to 3.20, coverage to 7.16.2, responses to 0.26.3, black to 26.10.1, poetry-dynamic-versioning to 1.10.1, and pylint to 4.1.3 (astroid 4.3.4)
+- ci: update actions/checkout from v4 to v7 in CodeQL (PR #168)
+- ci: use Poetry 2.5.1 for testing and publishing to support the current lockfile
+- chore: apply Black formatting and resolve retry decorator lint warnings without changing retry behavior
+- chore: bump the library patch version from 2.2.2 to 2.2.3
+
 #### [2.1.0](https://github.com/IvanildoBarauna/api-to-dataframe/compare/v2.0.6...v2.1.0)
 
 > 6 May 2026

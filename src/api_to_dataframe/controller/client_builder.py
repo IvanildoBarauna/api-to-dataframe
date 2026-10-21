@@ -41,11 +41,19 @@ class ClientBuilder:
             error_msg = "retries must be a positive integer (>= 1)"
             logger.error(error_msg)
             raise ValueError(error_msg)
-        if not isinstance(initial_delay, int) or isinstance(initial_delay, bool) or initial_delay < 0:
+        if (
+            not isinstance(initial_delay, int)
+            or isinstance(initial_delay, bool)
+            or initial_delay < 0
+        ):
             error_msg = "initial_delay must be a non-negative integer"
             logger.error(error_msg)
             raise ValueError(error_msg)
-        if not isinstance(connection_timeout, int) or isinstance(connection_timeout, bool) or connection_timeout < 0:
+        if (
+            not isinstance(connection_timeout, int)
+            or isinstance(connection_timeout, bool)
+            or connection_timeout < 0
+        ):
             error_msg = "connection_timeout must be a non-negative integer"
             logger.error(error_msg)
             raise ValueError(error_msg)
