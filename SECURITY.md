@@ -1,5 +1,9 @@
-## Security contact information
+# Política de Segurança
 
-To report a security vulnerability, please use the
-[Tidelift security contact](https://tidelift.com/security).
-Tidelift will coordinate the fix and disclosure.
+## Reportando uma vulnerabilidade
+
+Não abra issues públicas para falhas de segurança.
+Use a aba **Security → Report a vulnerability** deste repositório.
+
+Prazo de resposta inicial: até 72 horas.
+Versões suportadas: apenas a última versão publicada no PyPI.
